@@ -136,7 +136,7 @@ export default function App() {
               >
                 🤖
               </div>
-              <span style={{ fontSize: 16, fontWeight: 600 }}>Kaybee</span>
+              <span style={{ fontSize: 16, fontWeight: 600 }}>LuddyBuddy</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}

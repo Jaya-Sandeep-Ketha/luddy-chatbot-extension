@@ -1,5 +1,7 @@
 // ✅ src/App.jsx
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import ReactMarkdown from 'react-markdown';
 
 // 1) Define all your possible welcome texts
 const WELCOME_TEXTS = [
@@ -27,6 +29,7 @@ function getRandomWelcome() {
 }
 
 export default function App() {
+  const sessionIdRef = useRef(uuidv4());
   const [messages, setMessages] = useState([
     {
       sender: 'bot',
@@ -38,13 +41,15 @@ export default function App() {
   const [isOpen, setIsOpen] = useState(false);
 
 // 4) (Optional) if you want a new greeting *every time* the user re-opens:
-  const handleOpen = () => {
+const handleOpen = () => {
+  if (messages.length === 0) {
     setMessages([{
       sender: 'bot',
       text: getRandomWelcome()
     }]);
-    setIsOpen(true);
-  };
+  }
+  setIsOpen(true);
+};
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -53,13 +58,16 @@ export default function App() {
     setInput('');
     setTyping(true);
     try {
-      const res = await fetch('https://your-backend-url.com/api', {
+      const res = await fetch('http://127.0.0.1:8000/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input })
+        body: JSON.stringify({
+          prompt: input,
+          session_id: sessionIdRef.current
+        })
       });
       const data = await res.json();
-      setMessages([...newMessages, { sender: 'bot', text: data.reply || 'No response' }]);
+      setMessages([...newMessages, { sender: 'bot', text: data.response || 'No response' }]);
     } catch {
       setMessages([...newMessages, { sender: 'bot', text: '⚠️ Error reaching the server.' }]);
     } finally {
@@ -67,6 +75,25 @@ export default function App() {
     }
   };
 
+  const handleMinimize = () => {
+    setIsOpen(false);
+  };
+  
+  const handleCloseAndClear = async () => {
+    try {
+      await fetch('http://127.0.0.1:8000/exit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionIdRef.current })
+      });
+      localStorage.removeItem('luddy-session-id'); // optional
+      setMessages([]);
+    } catch (err) {
+      console.error('Error on exit:', err);
+    } finally {
+      setIsOpen(false);
+    }
+  };
   return (
     <>
       {/* Floating Button */}
@@ -79,7 +106,7 @@ export default function App() {
           width: 64,
           height: 64,
           borderRadius: '50%',
-          backgroundColor: '#2563EB',
+          backgroundColor: '#990200',
           color: '#FFF',
           border: 'none',
           boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
@@ -97,7 +124,7 @@ export default function App() {
             position: 'fixed',
             bottom: 24,
             right: 24,
-            width: 360,
+            width: 400,
             height: '85vh',
             backgroundColor: '#FFF',
             border: '2px solid #000',
@@ -112,7 +139,7 @@ export default function App() {
           {/* Header */}
           <div
             style={{
-              backgroundColor: '#2563EB',
+              backgroundColor: '#990200',
               color: '#FFF',
               padding: '16px',
               display: 'flex',
@@ -137,8 +164,9 @@ export default function App() {
                 🤖
               </div>
               <span style={{ fontSize: 16, fontWeight: 600 }}>LuddyBuddy</span>
+              
             </div>
-            <button
+            {/* <button
               onClick={() => setIsOpen(false)}
               style={{
                 background: 'none',
@@ -149,8 +177,65 @@ export default function App() {
               }}
             >
               ×
-            </button>
+            </button> */}
+            {/* <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={handleMinimize} title="Minimize"
+                style={{
+                  background: 'none', border: 'none', color: '#FFF',
+                  fontSize: 16, marginRight: 8, cursor: 'pointer'
+                }}>🔻</button>
+              <button onClick={handleCloseAndClear} title="Close & Clear"
+                style={{
+                  background: 'none', border: 'none', color: '#FFF',
+                  fontSize: 20, cursor: 'pointer'
+                }}>❌</button>
+            </div> */}
+
+<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+  <button
+    onClick={handleMinimize}
+    title="Minimize"
+    style={{
+      backgroundColor: 'transparent',
+      border: 'none',
+      color: '#FFDADA',
+      fontSize: '20px',
+      cursor: 'pointer',
+      borderRadius: '4px',
+      padding: '4px 8px',
+      transition: 'background 0.2s'
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#B30000'}
+    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+  >
+    &minus;
+  </button>
+
+  <button
+    onClick={handleCloseAndClear}
+    title="Close & Clear"
+    style={{
+      backgroundColor: 'transparent',
+      border: 'none',
+      color: '#FFDADA',
+      fontSize: '20px',
+      cursor: 'pointer',
+      borderRadius: '4px',
+      padding: '4px 8px',
+      transition: 'background 0.2s'
+    }}
+    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#B30000'}
+    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+  >
+    ✕
+  </button>
+</div>
+
           </div>
+
+          
+
+
 
           {/* Messages */}
           <div
@@ -178,30 +263,132 @@ export default function App() {
                       style={{
                         width: 24,
                         height: 24,
-                        backgroundColor: '#2563EB',
+                        backgroundColor: '#990200',
                         color: '#FFF',
                         borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 12
+                        fontSize: 10
                       }}
                     >
                       🤖
                     </div>
                   )}
-                  <div
-                    style={{
-                      backgroundColor: isBot ? '#F3F4F6' : '#2563EB',
-                      color: isBot ? '#333' : '#FFF',
-                      padding: '12px 16px',
-                      borderRadius: 12,
-                      maxWidth: '75%',
-                      lineHeight: 1.4
-                    }}
-                  >
-                    {msg.text}
-                  </div>
+                  {/* <div
+                      style={{
+                        backgroundColor: isBot ? '#F3F4F6' : '#990200',
+                        color: isBot ? '#333' : '#FFF',
+                        padding: '12px 12px 12px 16px',
+                        borderRadius: 12,
+                        maxWidth: '75%',
+                        lineHeight: 1.5,
+                        wordBreak: 'break-word',       // ✅ wraps long URLs
+                        whiteSpace: 'pre-wrap',        // ✅ respects markdown line breaks
+                        fontSize: '12px'               // ✅ smaller, clean font
+                      }}
+                    >
+  <ReactMarkdown
+    children={msg.text}
+    components={{
+      a: ({ node, ...props }) => (
+        <a
+          {...props}
+          style={{
+            color: '#990200',
+            textDecoration: 'underline',
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere'
+          }}
+          target="_blank"
+          rel="noopener noreferrer"
+        />
+      ),
+      strong: ({ node, ...props }) => (
+        <strong style={{ fontWeight: 'bold' }} {...props} />
+      ),
+      em: ({ node, ...props }) => (
+        <em style={{ fontStyle: 'italic' }} {...props} />
+      )
+    }}
+  />
+</div> */}
+<div
+  style={{
+    backgroundColor: isBot ? '#F3F4F6' : '#990200',
+    color: isBot ? '#333' : '#FFF',
+    padding: '12px 12px 12px 16px', // reduced right padding
+    borderRadius: 12,
+    maxWidth: '75%',
+    lineHeight: 1.5,
+    wordBreak: 'break-word',
+    whiteSpace: 'pre-wrap',
+    fontSize: '12px' // applies to outer container
+  }}
+>
+  <ReactMarkdown
+    components={{
+      p: ({ node, ...props }) => (
+        <p style={{ margin: 0, fontSize: '12px' }} {...props} />
+      ),
+      a: ({ node, ...props }) => (
+        <a
+          {...props}
+          style={{
+            color: '#990200',
+            textDecoration: 'underline',
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere',
+            fontSize: '12px'
+          }}
+          target="_blank"
+          rel="noopener noreferrer"
+        />
+      ),
+      strong: ({ node, ...props }) => (
+        <strong style={{ fontWeight: 'bold', fontSize: '12px' }} {...props} />
+      ),
+      em: ({ node, ...props }) => (
+        <em style={{ fontStyle: 'italic', fontSize: '12px' }} {...props} />
+      ),
+      ul: ({ node, ...props }) => (
+        <ul
+          style={{
+            listStyleType: 'disc',
+            paddingLeft: '20px',
+            margin: '8px 0',
+            fontSize: '12px',
+            color: '#333'
+          }}
+          {...props}
+        />
+      ),
+      ol: ({ node, ...props }) => (
+        <ol
+          style={{
+            listStyleType: 'decimal',
+            paddingLeft: '20px',
+            margin: '8px 0',
+            fontSize: '12px',
+            color: '#333'
+          }}
+          {...props}
+        />
+      ),
+      li: ({ node, ...props }) => (
+        <li
+          style={{
+            marginBottom: '4px',
+            lineHeight: '1.5',
+          }}
+          {...props}
+        />
+      ),
+    }}
+  >
+    {msg.text}
+  </ReactMarkdown>
+</div>
                   {!isBot && (
                     <div style={{ width: 24, marginLeft: 8 }} />
                   )}
@@ -275,7 +462,7 @@ export default function App() {
                 style={{
                   width: 40,
                   height: 40,
-                  backgroundColor: '#2563EB',
+                  backgroundColor: '#990200',
                   border: 'none',
                   borderRadius: '50%',
                   display: 'flex',
